@@ -159,6 +159,40 @@ export class FolderMappingManager {
   }
 
   /**
+   * 反向查找：根据 IMA 笔记本的 folderId 或 folderName，找到对应的本地路径前缀。
+   *
+   * 用于 Pull 方向：把 IMA 笔记写入与 Push 方向相同的本地目录，
+   * 实现 Push/Pull 共用同一套 folderMappings 配置。
+   *
+   * 优先级：folderId 精确匹配 > folderName 精确匹配 > null（未配置则返回 null）
+   */
+  resolveLocalPrefix(folderId?: string, folderName?: string): string | null {
+    if (this.settings.folderMappingMode === "default-only") {
+      // default-only 模式：没有映射表，返回空串表示写到 vault 根目录
+      return "";
+    }
+
+    // 优先按 folderId 精确匹配（最可靠）
+    if (folderId) {
+      const hit = this.settings.folderMappings.find(
+        (m) => m.folderId === folderId && m.sync !== false
+      );
+      if (hit) return hit.localPrefix;
+    }
+
+    // 其次按 folderName 匹配
+    if (folderName) {
+      const hit = this.settings.folderMappings.find(
+        (m) => m.folderName === folderName && m.sync !== false
+      );
+      if (hit) return hit.localPrefix;
+    }
+
+    // 未找到映射 → 返回 null，调用方决定是否跳过或用兜底目录
+    return null;
+  }
+
+  /**
    * Return the top-level folder name for a vault-relative path.
    * Files that live directly in the vault root return "" (empty string).
    */

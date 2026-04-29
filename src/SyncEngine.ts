@@ -204,9 +204,10 @@ export class SyncEngine {
       stats.total = items.length;
       if (!silent) new Notice(`Pulling ${items.length} note(s) from IMA`);
 
+      const mappingManager = new FolderMappingManager(this.settings);
       for (const item of items) {
         try {
-          const outcome = await this.pullSingleItem(puller, item);
+          const outcome = await this.pullSingleItem(puller, item, mappingManager);
           stats[outcome] = (stats[outcome] as number) + 1;
         } catch (e) {
           stats.failed++;
@@ -504,7 +505,7 @@ export class SyncEngine {
   //                              Pull (internals)
   // ---------------------------------------------------------------------
 
-  private async pullSingleItem(provider: SyncProvider, item: RemoteItem): Promise<PullOutcome> {
+  private async pullSingleItem(provider: SyncProvider, item: RemoteItem, mappingManager?: FolderMappingManager): Promise<PullOutcome> {
     const knownEntry = this.settings.remoteIndex[item.remoteId];
     let existingFile: TFile | null = null;
 
@@ -514,7 +515,7 @@ export class SyncEngine {
     }
 
     if (!existingFile) {
-      return this.pullCreate(provider, item);
+      return this.pullCreate(provider, item, mappingManager);
     }
 
     const localState = this.settings.fileStates[existingFile.path];
@@ -562,11 +563,11 @@ export class SyncEngine {
     return "updated";
   }
 
-  private async pullCreate(provider: SyncProvider, item: RemoteItem): Promise<PullOutcome> {
+  private async pullCreate(provider: SyncProvider, item: RemoteItem, mappingManager?: FolderMappingManager): Promise<PullOutcome> {
     try {
       const rc = await provider.fetchRemote!(item);
       const body = this.wrapPulledContent(item, rc);
-      const rel = this.buildPullTargetPath(item);
+      const rel = this.buildPullTargetPath(item, mappingManager);
       await this.ensureFolder(rel);
       const file = await this.app.vault.create(rel, body);
       this.recordPullState(file.path, item, body);
@@ -614,15 +615,29 @@ export class SyncEngine {
     return meta + head + rc.content;
   }
 
-  private buildPullTargetPath(item: RemoteItem): string {
+  private buildPullTargetPath(item: RemoteItem, mappingManager?: FolderMappingManager): string {
     const sanitize = (s: string): string =>
       s.replace(/[\\/:*?"<>|]/g, "_").replace(/\s+$/g, "").slice(0, 120) || "untitled";
-    const root = this.settings.pullTargetFolder.trim();
+
     const parts: string[] = [];
-    if (root) parts.push(root);
-    if (this.settings.pullMirrorNotebookFolders && item.groupName) {
-      parts.push(sanitize(item.groupName));
+
+    // 优先：通过 folderMappings 反查本地目录（与 Push 方向共用同一套配置）
+    const folderId = (item.extra as Record<string, string> | undefined)?.folder_id;
+    const localPrefix = mappingManager?.resolveLocalPrefix(folderId, item.groupName) ?? null;
+
+    if (localPrefix !== null) {
+      // 找到映射：直接写入对应的本地目录，不再额外建笔记本子目录
+      if (localPrefix) parts.push(localPrefix);
+    } else {
+      // 未找到映射（笔记本未配置）：降级到 pullTargetFolder 兜底
+      const root = this.settings.pullTargetFolder.trim();
+      if (root) parts.push(root);
+      // 兜底模式下仍支持按笔记本名建子目录
+      if (this.settings.pullMirrorNotebookFolders && item.groupName) {
+        parts.push(sanitize(item.groupName));
+      }
     }
+
     parts.push(sanitize(item.title) + ".md");
     let candidate = normalizePath(parts.join("/"));
 

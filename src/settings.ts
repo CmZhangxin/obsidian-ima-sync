@@ -347,30 +347,42 @@ export class ImaSyncSettingTab extends PluginSettingTab {
     if (this.plugin.settings.direction !== "push") {
       new Setting(body).setName("Pull options").setHeading();
 
-      new Setting(body)
-        .setName("Pull target folder")
-        .setDesc("IMA notes will be written into this folder in the vault.")
-        .addText((t) =>
-          t
-            .setPlaceholder("IMA")
-            .setValue(this.plugin.settings.pullTargetFolder)
-            .onChange(async (value) => {
-              this.plugin.settings.pullTargetFolder = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
+      const isSmartMode = this.plugin.settings.folderMappingMode === "smart";
 
-      new Setting(body)
-        .setName("Mirror notebooks as subfolders")
-        .setDesc("When enabled, each IMA notebook becomes a subfolder.")
-        .addToggle((tg) =>
-          tg
-            .setValue(this.plugin.settings.pullMirrorNotebookFolders)
-            .onChange(async (value) => {
-              this.plugin.settings.pullMirrorNotebookFolders = value;
-              await this.plugin.saveSettings();
-            })
-        );
+      if (isSmartMode) {
+        // Smart 模式：Pull 目标目录由 folderMappings 反查决定，与 Push 共用同一套配置
+        body.createEl("p", {
+          text: "Pull target folders are determined by the folder → notebook mapping above. " +
+            "Each IMA notebook will be pulled into its mapped local folder automatically.",
+          cls: "ima-sync-hint",
+        });
+      } else {
+        // default-only 模式：没有映射表，需要手动指定兜底目录
+        new Setting(body)
+          .setName("Pull target folder")
+          .setDesc("IMA notes will be written into this folder in the vault.")
+          .addText((t) =>
+            t
+              .setPlaceholder("IMA")
+              .setValue(this.plugin.settings.pullTargetFolder)
+              .onChange(async (value) => {
+                this.plugin.settings.pullTargetFolder = value.trim();
+                await this.plugin.saveSettings();
+              })
+          );
+
+        new Setting(body)
+          .setName("Mirror notebooks as subfolders")
+          .setDesc("When enabled, each IMA notebook becomes a subfolder.")
+          .addToggle((tg) =>
+            tg
+              .setValue(this.plugin.settings.pullMirrorNotebookFolders)
+              .onChange(async (value) => {
+                this.plugin.settings.pullMirrorNotebookFolders = value;
+                await this.plugin.saveSettings();
+              })
+          );
+      }
 
       new Setting(body)
         .setName("Only pull these notebooks")
