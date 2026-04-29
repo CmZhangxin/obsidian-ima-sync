@@ -1,0 +1,13 @@
+node_modules/
+main.js
+main.js.map
+dist/
+*.log
+.DS_Store
+.idea/
+.vscode/
+.obsidian/
+data.json
+coverage/
+.tsbuildinfo
+.ima-skill/

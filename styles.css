@@ -1,0 +1,39 @@
+/* IMA Sync plugin — all styles live in this file (Obsidian guideline:
+ * don't assign styles via JavaScript or inline HTML). */
+
+/* ----------------------- Settings tab ------------------------- */
+
+/* Hint line below the auto-sync dropdown */
+.ima-sync-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: -6px 0 12px 0;
+}
+
+/* Collapsible "Advanced options" block */
+.ima-sync-advanced {
+  margin-top: 24px;
+}
+
+.ima-sync-advanced-summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 6px 0;
+}
+
+/* ----------------------- Mapping wizard ------------------------- */
+
+.ima-sync-wizard-notice {
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  font-size: 12px;
+}
+
+.ima-sync-wizard-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
