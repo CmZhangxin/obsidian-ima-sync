@@ -46,7 +46,7 @@ npm run build
 Copy the three release artifacts into your vault:
 
 ```
-<YourVault>/.obsidian/plugins/obsidian-ima-sync/
+<YourVault>/.obsidian/plugins/ima-sync/
 ├── main.js
 ├── manifest.json
 └── styles.css
@@ -164,7 +164,7 @@ When both sides have changed, the *Conflict strategy* picker decides:
 | *"N note(s) failed because their target notebook no longer exists"* | You deleted/renamed a notebook in the IMA app; reopen the wizard and re-map |
 | *"Another sync is already running"* | A previous run is still in flight; wait for it or check the devtools console |
 
-For more detail, open the devtools console (`Ctrl/Cmd+Shift+I`). All plugin logs are prefixed with `[obsidian-ima-sync]`.
+For more detail, open the devtools console (`Ctrl/Cmd+Shift+I`). All plugin logs are prefixed with `[ima-sync]`.
 
 ---
 

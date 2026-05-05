@@ -7,7 +7,7 @@
  *   discourages chatty console output in production).
  */
 
-const LOG_PREFIX = "[obsidian-ima-sync]";
+const LOG_PREFIX = "[ima-sync]";
 
 export function logDebug(...args: unknown[]): void {
   // Intentionally use console.debug so it's hidden unless users opt-in to the

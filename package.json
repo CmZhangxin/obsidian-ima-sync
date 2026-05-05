@@ -1,5 +1,5 @@
 {
-  "name": "obsidian-ima-sync",
+  "name": "ima-sync",
   "version": "0.1.0",
   "description": "Sync your Obsidian vault to Tencent IMA (ima.qq.com) knowledge base.",
   "main": "main.js",

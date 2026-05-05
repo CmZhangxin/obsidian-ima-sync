@@ -11,3 +11,7 @@ data.json
 coverage/
 .tsbuildinfo
 .ima-skill/
+.env
+.env.*
+*.pem
+*.key

@@ -60,7 +60,7 @@ export class ImaApiClient {
     this.baseUrl = (opts.baseUrl?.trim() || DEFAULT_IMA_BASE_URL).replace(/\/$/, "");
     this.clientId = opts.clientId;
     this.apiKey = opts.apiKey;
-    this.skillVersion = opts.skillVersion || "obsidian-ima-sync/0.1.0";
+    this.skillVersion = opts.skillVersion || "ima-sync/0.1.0";
   }
 
   /** 基础 POST，返回已解析的 data 字段 */
