@@ -1,7 +1,7 @@
 {
   "name": "ima-sync",
   "version": "0.1.0",
-  "description": "Sync your Obsidian vault to Tencent IMA (ima.qq.com) knowledge base.",
+  "description": "Sync your notes to Tencent IMA (ima.qq.com) knowledge base.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
