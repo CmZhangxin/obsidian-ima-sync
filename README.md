@@ -1,4 +1,4 @@
-# Obsidian IMA Sync
+# IMA Sync
 
 > Sync your Obsidian vault to Tencent **IMA** ([ima.qq.com](https://ima.qq.com)) knowledge base via the official OpenAPI.
 
@@ -16,12 +16,6 @@
 
 Every note is routed to a specific IMA notebook according to a **folder-to-notebook mapping table** that you configure once via the built-in wizard.
 
-> Screenshots:
-> - `docs/screenshots/settings.png` – settings tab
-> - `docs/screenshots/wizard.png` – folder-to-notebook mapping wizard
->
-> *(placeholders — add real images before publishing)*
-
 ---
 
 ## Requirements
@@ -34,16 +28,22 @@ Every note is routed to a specific IMA notebook according to a **folder-to-noteb
 
 ## Install
 
-### From source
+### Option 1 — Community plugins (after marketplace approval)
 
-```bash
-git clone https://github.com/CmZhangxin/obsidian-ima-sync.git
-cd obsidian-ima-sync
-npm install
-npm run build
-```
+> Not yet available. This route will light up once the submission PR to [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases/pull/12542) is merged.
 
-Copy the three release artifacts into your vault:
+1. Open Obsidian → *Settings → Community plugins* → turn off *Restricted mode*.
+2. Click **Browse**, search for **"IMA Sync"**, then click **Install** → **Enable**.
+
+### Option 2 — Manual install from a GitHub release (works today)
+
+Grab the three files from the [latest release](https://github.com/CmZhangxin/obsidian-ima-sync/releases/latest):
+
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+Put them into your vault:
 
 ```
 <YourVault>/.obsidian/plugins/ima-sync/
@@ -52,13 +52,43 @@ Copy the three release artifacts into your vault:
 └── styles.css
 ```
 
-Then enable **IMA Sync** under *Settings → Community plugins*.
+One-liner (macOS/Linux, replace `<YourVault>`):
+
+```bash
+VAULT=<YourVault>
+VERSION=0.1.0
+DIR="$VAULT/.obsidian/plugins/ima-sync"
+mkdir -p "$DIR"
+cd "$DIR"
+for f in main.js manifest.json styles.css; do
+  curl -fsSL -o "$f" "https://github.com/CmZhangxin/obsidian-ima-sync/releases/download/$VERSION/$f"
+done
+```
+
+Then restart Obsidian (or press `Ctrl/Cmd + P` → *Reload app without saving*) and enable **IMA Sync** under *Settings → Community plugins*.
+
+### Option 3 — Build from source
+
+```bash
+git clone https://github.com/CmZhangxin/obsidian-ima-sync.git
+cd obsidian-ima-sync
+npm install
+npm run build
+```
+
+Then copy `main.js`, `manifest.json`, `styles.css` into `<YourVault>/.obsidian/plugins/ima-sync/` as shown above, or — for iterative development — symlink the whole repo:
+
+```bash
+ln -s "$(pwd)" "<YourVault>/.obsidian/plugins/ima-sync"
+```
 
 ### Development
 
 ```bash
 npm run dev   # esbuild watch mode
 ```
+
+Edits to `src/**/*.ts` are rebuilt into `main.js` automatically; reload the plugin in Obsidian to pick up changes (*Settings → Community plugins →* toggle off/on, or `Ctrl/Cmd + P` → *Reload app without saving*).
 
 ---
 
@@ -93,7 +123,7 @@ Under *Settings → Trigger*:
 
 - **Off (manual only)** – nothing happens until you press a button.
 - **On file save** – each saved note is pushed (debounced ~1.5s).
-- **Every N minutes** – periodic background sync.
+- **Every n minutes** – periodic background sync.
 
 ### Frontmatter written back
 
@@ -123,9 +153,8 @@ If you enable *Advanced → Strip frontmatter*, this writeback is disabled.
 
 Because IMA has **no in-place update API**, content changes are handled per the *Advanced → On-change strategy*:
 
-- `Skip` – keep the first synced version only.
-- `Append` – append new content to the existing note with a timestamp separator.
-- `Recreate` – create a brand-new note each time the content changes (old note stays on IMA).
+- `Skip` – keep the first synced version only; later local edits are ignored.
+- `Recreate` – create a brand-new note each time the content changes. The old note gets renamed to `<title> v1 / v2 / …` on IMA so you can prune old versions yourself.
 
 ### Pull (IMA → Obsidian)
 
@@ -159,7 +188,7 @@ When both sides have changed, the *Conflict strategy* picker decides:
 
 | Notice you see | What it usually means |
 |---|---|
-| *"Please configure Client ID and API key first"* | Credentials missing — go to *Settings → Credentials* |
+| *"Please configure client ID and API key first"* | Credentials missing — go to *Settings → Credentials* |
 | *"First sync: please configure your folder-to-notebook mapping first"* | You haven't completed the wizard yet |
 | *"N note(s) failed because their target notebook no longer exists"* | You deleted/renamed a notebook in the IMA app; reopen the wizard and re-map |
 | *"Another sync is already running"* | A previous run is still in flight; wait for it or check the devtools console |
