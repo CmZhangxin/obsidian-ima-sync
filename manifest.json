@@ -6,5 +6,5 @@
   "description": "Sync your Obsidian vault to Tencent IMA (ima.qq.com) via the official OpenAPI.",
   "author": "CmZhangxin",
   "authorUrl": "https://github.com/CmZhangxin",
-  "isDesktopOnly": false
+  "isDesktopOnly": true
 }

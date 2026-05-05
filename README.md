@@ -150,7 +150,7 @@ When both sides have changed, the *Conflict strategy* picker decides:
 - **No delete propagation.** IMA's OpenAPI does not expose a delete endpoint; the plugin never removes notes on IMA even if you delete them locally.
 - **No attachment upload.** The OpenAPI channel only accepts markdown bodies. PNG/PDF/etc. are silently skipped even with *Include attachments* on.
 - **Pull is plaintext.** `get_doc_content` does not support `MARKDOWN` format, so pulled notes lose their original formatting.
-- **Mobile.** The plugin itself does not require desktop-only APIs (`isDesktopOnly: false`), but network performance depends on the IMA endpoint reachability on mobile.
+- **Mobile.** Currently desktop-only (`isDesktopOnly: true`). The plugin doesn't rely on desktop-only APIs, so mobile support may be enabled in a future release once it has been properly tested on iOS and Android.
 - **No notebook creation via API.** You must create notebooks manually in the IMA desktop app.
 
 ---
