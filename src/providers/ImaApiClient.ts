@@ -104,7 +104,7 @@ export class ImaApiClient {
       throw new ImaApiError(payload.code, payload.msg || "unknown error", apiPath);
     }
 
-    return (payload.data ?? ({} as T)) as T;
+    return payload.data ?? ({} as T);
   }
 
   // ================== 笔记 API ==================

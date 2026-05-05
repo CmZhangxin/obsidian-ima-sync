@@ -105,7 +105,7 @@ export class FolderMappingWizardModal extends Modal {
   private async loadNotebooks(): Promise<void> {
     const { clientId, apiKey } = this.plugin.settings;
     if (!clientId || !apiKey) {
-      new Notice("Please configure Client ID and API key first", 5000);
+      new Notice("Please configure client ID and API key first", 5000);
       return;
     }
     this.loadingNotebooks = true;
@@ -145,16 +145,16 @@ export class FolderMappingWizardModal extends Modal {
     });
 
     const notice = contentEl.createDiv({ cls: "ima-sync-wizard-notice" });
-    notice.createEl("div", {
+    notice.createDiv({
       text:
-        "Note: IMA does not allow creating notebooks via API. " +
-        "If the notebook you want isn't in the list below, create it in the IMA app first, " +
+        "Note: Ima does not allow creating notebooks via API. " +
+        "If the notebook you want isn't in the list below, create it in the Ima app first, " +
         "then click Refresh.",
     });
 
     // Notebook list status
     const statusRow = new Setting(contentEl);
-    statusRow.setName("IMA notebooks");
+    statusRow.setName("Ima notebooks");
     if (this.loadingNotebooks) {
       statusRow.setDesc("Loading…");
     } else {
@@ -184,7 +184,7 @@ export class FolderMappingWizardModal extends Modal {
       );
 
       row.addDropdown((dd) => {
-        dd.addOption(DONT_SYNC, "— Don't sync —");
+        dd.addOption(DONT_SYNC, "Don't sync");
         for (const nb of this.notebooks) {
           dd.addOption(nb.folder_id, `${nb.name}  (${nb.note_number ?? 0} notes)`);
         }
@@ -221,10 +221,12 @@ export class FolderMappingWizardModal extends Modal {
       text: "Save mapping",
       cls: "mod-cta",
     });
-    confirmBtn.addEventListener("click", async () => {
-      await this.persist();
-      this.onFinish?.(true);
-      this.close();
+    confirmBtn.addEventListener("click", () => {
+      void (async () => {
+        await this.persist();
+        this.onFinish?.(true);
+        this.close();
+      })();
     });
   }
 

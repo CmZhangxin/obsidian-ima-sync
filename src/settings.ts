@@ -31,8 +31,8 @@ export class ImaSyncSettingTab extends PluginSettingTab {
 
     containerEl.createEl("p", {
       text:
-        "Sync your Obsidian vault with Tencent IMA (ima.qq.com). " +
-        "Get your Client ID / API key at https://ima.qq.com/agent-interface.",
+        "Sync your vault with Tencent Ima (ima.qq.com). " +
+        "Get your client ID / API key at `https://ima.qq.com/agent-interface`.",
     });
 
     // ======================================================
@@ -64,10 +64,10 @@ export class ImaSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Client ID")
-      .setDesc("From https://ima.qq.com/agent-interface.")
+      .setDesc("From `https://ima.qq.com/agent-interface`.")
       .addText((t) =>
         t
-          .setPlaceholder("your-client-id")
+          .setPlaceholder("Your client ID")
           .setValue(this.plugin.settings.clientId)
           .onChange(async (value) => {
             this.plugin.settings.clientId = value.trim();
@@ -80,7 +80,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
       .setDesc("Keep this private — never commit it to a public repository.")
       .addText((t) => {
         t.inputEl.type = "password";
-        t.setPlaceholder("your-api-key")
+        t.setPlaceholder("Your API key")
           .setValue(this.plugin.settings.apiKey)
           .onChange(async (value) => {
             this.plugin.settings.apiKey = value.trim();
@@ -191,8 +191,8 @@ export class ImaSyncSettingTab extends PluginSettingTab {
       )
       .addDropdown((dd) =>
         dd
-          .addOption("push", "Push (Obsidian → IMA)")
-          .addOption("pull", "Pull (IMA → Obsidian)")
+          .addOption("push", "Push (Obsidian → ima)")
+          .addOption("pull", "Pull (ima → Obsidian)")
           .addOption("bidirectional", "Bidirectional")
           .setValue(this.plugin.settings.direction)
           .onChange(async (value) => {
@@ -223,7 +223,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
         dd
           .addOption("manual", "Off (manual only)")
           .addOption("on-save", "On file save (push only)")
-          .addOption("interval", "Every N minutes")
+          .addOption("interval", "Every n minutes")
           .setValue(this.plugin.settings.trigger)
           .onChange(async (value) => {
             this.plugin.settings.trigger = value as SyncTrigger;
@@ -253,7 +253,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
     // Soft hint so users don't wonder "if auto is on, do I still need to press
     // the buttons below?" — the answer is 'no, but you can'.
     if (this.plugin.settings.trigger !== "manual") {
-      containerEl.createEl("div", {
+      containerEl.createDiv({
         text: "Auto sync is on. You can still run a manual sync below anytime.",
         cls: "ima-sync-hint",
       });
@@ -273,8 +273,8 @@ export class ImaSyncSettingTab extends PluginSettingTab {
       .setDesc(lastPull ? new Date(lastPull).toLocaleString() : "Never");
 
     new Setting(containerEl)
-      .setName("Push to IMA")
-      .setDesc("Send local notes to IMA now.")
+      .setName("Push to ima")
+      .setDesc("Send local notes to ima now.")
       .addButton((b) =>
         b
           .setButtonText("Push")
@@ -286,8 +286,8 @@ export class ImaSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Pull from IMA")
-      .setDesc("Fetch notes from IMA now.")
+      .setName("Pull from ima")
+      .setDesc("Fetch notes from ima now.")
       .addButton((b) =>
         b.setButtonText("Pull").onClick(async () => {
           await this.plugin.runPullCommand();
@@ -323,7 +323,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
     const body = details.createDiv();
 
     // ---- OpenAPI: on-change strategy ----
-    new Setting(body).setName("OpenAPI (advanced)").setHeading();
+    new Setting(body).setName("Openapi").setHeading();
 
     new Setting(body)
       .setName("On-change strategy")
@@ -345,7 +345,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
 
     // ---- Pull options ----
     if (this.plugin.settings.direction !== "push") {
-      new Setting(body).setName("Pull options").setHeading();
+      new Setting(body).setName("Pull").setHeading();
 
       const isSmartMode = this.plugin.settings.folderMappingMode === "smart";
 
@@ -360,7 +360,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
         // default-only 模式：没有映射表，需要手动指定兜底目录
         new Setting(body)
           .setName("Pull target folder")
-          .setDesc("IMA notes will be written into this folder in the vault.")
+          .setDesc("Ima notes will be written into this folder in the vault.")
           .addText((t) =>
             t
               .setPlaceholder("IMA")
@@ -373,7 +373,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
 
         new Setting(body)
           .setName("Mirror notebooks as subfolders")
-          .setDesc("When enabled, each IMA notebook becomes a subfolder.")
+          .setDesc("When enabled, each ima notebook becomes a subfolder.")
           .addToggle((tg) =>
             tg
               .setValue(this.plugin.settings.pullMirrorNotebookFolders)
@@ -386,10 +386,10 @@ export class ImaSyncSettingTab extends PluginSettingTab {
 
       new Setting(body)
         .setName("Only pull these notebooks")
-        .setDesc("Comma-separated folder_id list. Leave empty to pull all.")
+        .setDesc("Comma-separated folder ID list. Leave empty to pull all.")
         .addText((t) =>
           t
-            .setPlaceholder("fld_xxx, fld_yyy")
+            .setPlaceholder("Example: fld_xxx, fld_yyy")
             .setValue(this.plugin.settings.pullIncludeNotebookIds.join(", "))
             .onChange(async (value) => {
               this.plugin.settings.pullIncludeNotebookIds = splitList(value);
@@ -410,7 +410,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
           dd
             .addOption("newest-wins", "Newest wins (default)")
             .addOption("local-wins", "Local wins (keep Obsidian)")
-            .addOption("remote-wins", "Remote wins (keep IMA)")
+            .addOption("remote-wins", "Remote wins (keep ima)")
             .addOption("keep-both", "Keep both (writes a .conflict file)")
             .addOption("skip", "Skip on conflict")
             .setValue(this.plugin.settings.conflictStrategy)
@@ -450,8 +450,8 @@ export class ImaSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(body)
-      .setName("Max note size (MB)")
-      .setDesc("Content larger than this will be truncated to stay below the IMA 210009 limit.")
+      .setName("Max note size in megabytes")
+      .setDesc("Content larger than this will be truncated to stay below the ima 210009 limit.")
       .addSlider((s) =>
         s
           .setLimits(1, 20, 1)
@@ -469,7 +469,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
     new Setting(body)
       .setName("Reset local sync state")
       .setDesc(
-        "After reset, the next push re-uploads every file — which may create duplicates in IMA."
+        "After reset, the next push re-uploads every file — which may create duplicates in ima."
       )
       .addButton((b) =>
         b
@@ -493,7 +493,7 @@ export class ImaSyncSettingTab extends PluginSettingTab {
   private buildClient(): ImaApiClient | null {
     const s = this.plugin.settings;
     if (!s.clientId || !s.apiKey) {
-      new Notice("Please configure Client ID and API key first", 5000);
+      new Notice("Please configure client ID and API key first", 5000);
       return null;
     }
     return new ImaApiClient({

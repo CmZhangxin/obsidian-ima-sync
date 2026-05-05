@@ -41,9 +41,14 @@ export class ImaOpenApiProvider implements SyncProvider {
     });
   }
 
-  async precheck(): Promise<void> {
-    if (!this.settings.clientId) throw new Error("Client ID is not configured");
-    if (!this.settings.apiKey) throw new Error("API key is not configured");
+  precheck(): Promise<void> {
+    if (!this.settings.clientId) {
+      return Promise.reject(new Error("Client ID is not configured"));
+    }
+    if (!this.settings.apiKey) {
+      return Promise.reject(new Error("API key is not configured"));
+    }
+    return Promise.resolve();
   }
 
   async upsert(payload: SyncPayload): Promise<SyncResult> {
@@ -77,11 +82,11 @@ export class ImaOpenApiProvider implements SyncProvider {
     }
   }
 
-  async remove(_relativePath: string, _remoteId?: string): Promise<DeleteResult> {
-    return {
+  remove(_relativePath: string, _remoteId?: string): Promise<DeleteResult> {
+    return Promise.resolve({
       success: false,
       error: "IMA does not support deletions via API — please delete the note inside the IMA app instead",
-    };
+    });
   }
 
   // ========================= Pull 方向 =========================

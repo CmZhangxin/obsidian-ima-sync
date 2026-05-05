@@ -270,7 +270,7 @@ export default class ImaSyncPlugin extends Plugin {
   rescheduleTimers(): void {
     if (this.settings.trigger !== "interval") return;
     const ms = Math.max(1, this.settings.intervalMinutes) * 60 * 1000;
-    const id = window.setInterval(() => {
+    const id = activeWindow.setInterval(() => {
       const dir = this.settings.direction;
       const task =
         dir === "pull"
@@ -301,7 +301,7 @@ export default class ImaSyncPlugin extends Plugin {
   // ---------------- Commands ----------------
 
   async runPushCommand(): Promise<void> {
-    if (await this.interceptForWizard()) return;
+    if (this.interceptForWizard()) return;
     await this.engine.runFullSync(false);
     this.refreshStatusBar();
   }
@@ -312,7 +312,7 @@ export default class ImaSyncPlugin extends Plugin {
   }
 
   async runBidirectionalCommand(): Promise<void> {
-    if (await this.interceptForWizard()) return;
+    if (this.interceptForWizard()) return;
     await this.engine.runBidirectional(false);
     this.refreshStatusBar();
   }
@@ -343,7 +343,7 @@ export default class ImaSyncPlugin extends Plugin {
    * Returns true when the push has been intercepted (the user needs to
    * rerun after finishing).
    */
-  private async interceptForWizard(): Promise<boolean> {
+  private interceptForWizard(): boolean {
     if (this.settings.folderMappingMode !== "smart") return false;
     if (!this.settings.clientId || !this.settings.apiKey) return false;
 

@@ -173,7 +173,7 @@ export class SyncEngine {
     }
 
     const puller = this.getProviders().find(
-      (p) => p.supportsPull && p.listRemote && p.fetchRemote
+      (p) => p.supportsPull && typeof p.listRemote === "function" && typeof p.fetchRemote === "function"
     );
     if (!puller) {
       if (!silent) new Notice("Pull is not supported in the current sync mode");
@@ -208,7 +208,7 @@ export class SyncEngine {
       for (const item of items) {
         try {
           const outcome = await this.pullSingleItem(puller, item, mappingManager);
-          stats[outcome] = (stats[outcome] as number) + 1;
+          stats[outcome] = stats[outcome] + 1;
         } catch (e) {
           stats.failed++;
           stats.errors.push({ remoteId: item.remoteId, error: (e as Error).message });
@@ -449,7 +449,7 @@ export class SyncEngine {
       } finally {
         // 延迟解除屏蔽，确保 processFrontMatter 触发的 modify 事件已被消费。
         // 200ms 足够 Obsidian 内部事件循环处理完毕，同时远小于 debounce 窗口。
-        setTimeout(() => this.onWritebackEnd?.(rel), 200);
+        activeWindow.setTimeout(() => this.onWritebackEnd?.(rel), 200);
       }
     }
 
