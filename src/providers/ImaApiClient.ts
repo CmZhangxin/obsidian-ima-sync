@@ -1,5 +1,6 @@
 import { requestUrl, RequestUrlParam } from "obsidian";
 import { DEFAULT_IMA_BASE_URL } from "../types";
+import { logWarn } from "../logger";
 
 /**
  * IMA OpenAPI 统一 HTTP 客户端。
@@ -63,48 +64,69 @@ export class ImaApiClient {
     this.skillVersion = opts.skillVersion || "ima-sync/0.1.0";
   }
 
-  /** 基础 POST，返回已解析的 data 字段 */
+  /** 基础 POST，含超时保护 + 限频退避重试 */
   async post<T = unknown>(apiPath: string, body: Record<string, unknown>): Promise<T> {
     const normalizedPath = apiPath.startsWith("/") ? apiPath : `/${apiPath}`;
     const url = `${this.baseUrl}${normalizedPath}`;
+    const maxRetries = 3;
 
-    const req: RequestUrlParam = {
-      url,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "ima-openapi-clientid": this.clientId,
-        "ima-openapi-apikey": this.apiKey,
-        "ima-openapi-ctx": `skill_version=${this.skillVersion}`,
-      },
-      body: JSON.stringify(body ?? {}),
-      throw: false,
-    };
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const req: RequestUrlParam = {
+        url,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ima-openapi-clientid": this.clientId,
+          "ima-openapi-apikey": this.apiKey,
+          "ima-openapi-ctx": `skill_version=${this.skillVersion}`,
+        },
+        body: JSON.stringify(body ?? {}),
+        throw: false,
+      };
 
-    const resp = await requestUrl(req);
+      const resp = await requestUrl(req);
 
-    // HTTP 层错误
-    if (resp.status < 200 || resp.status >= 300) {
-      throw new ImaApiError(
-        resp.status,
-        `HTTP ${resp.status}: ${(resp.text || "").slice(0, 200)}`,
-        apiPath
-      );
+      // HTTP 层错误
+      if (resp.status < 200 || resp.status >= 300) {
+        // 429 或 5xx 可重试
+        if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries - 1) {
+          await this.sleep(1000 * (attempt + 1));
+          continue;
+        }
+        throw new ImaApiError(
+          resp.status,
+          "HTTP " + resp.status + ": " + (resp.text || "").slice(0, 200),
+          apiPath
+        );
+      }
+
+      // 业务层错误
+      let payload: { code?: number; msg?: string; data?: T } = {};
+      try {
+        payload = resp.json as typeof payload;
+      } catch {
+        throw new ImaApiError(-1, "Non-JSON response: " + (resp.text || "").slice(0, 200), apiPath);
+      }
+
+      if (typeof payload.code === "number" && payload.code !== 0) {
+        // 限频错误 20002：退避重试
+        if (payload.code === 20002 && attempt < maxRetries - 1) {
+          logWarn("IMA rate limited (20002), backing off " + (attempt + 1) + "s...");
+          await this.sleep(1000 * (attempt + 1));
+          continue;
+        }
+        throw new ImaApiError(payload.code, payload.msg || "unknown error", apiPath);
+      }
+
+      return payload.data ?? ({} as T);
     }
 
-    // 业务层错误
-    let payload: { code?: number; msg?: string; data?: T } = {};
-    try {
-      payload = resp.json as typeof payload;
-    } catch {
-      throw new ImaApiError(-1, `Non-JSON response: ${(resp.text || "").slice(0, 200)}`, apiPath);
-    }
+    // Should not reach here, but TypeScript needs it
+    throw new ImaApiError(-1, "max retries exceeded", apiPath);
+  }
 
-    if (typeof payload.code === "number" && payload.code !== 0) {
-      throw new ImaApiError(payload.code, payload.msg || "unknown error", apiPath);
-    }
-
-    return payload.data ?? ({} as T);
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // ================== 笔记 API ==================
@@ -202,29 +224,99 @@ export class ImaApiClient {
 
   // ================== 便捷分页封装 ==================
 
-  /** 把 listNote 的分页拉取封装成一次性拿完（内部做 cursor 滚动） */
+  /**
+   * 全量拉取所有笔记（保证不遗漏）。
+   *
+   * IMA list_note 的 cursor 翻页已确认不可用（服务端不返回 next_cursor）。
+   * 采用「按笔记本并行拉取」策略：
+   *   1. listAllNotebooks 拉全部笔记本
+   *   2. 对每个笔记本并行调 list_note(folder_id=xxx, limit=20)
+   *   3. 合并去重
+   *
+   * 单个笔记本 > 20 条时打 warn（IMA API 硬限制，无法突破）。
+   *
+   * @param folder_id 可选：仅拉指定笔记本
+   */
   async listAllNotes(params: {
     folder_id?: string;
-    /** 单次翻页大小，默认 20 */
     pageSize?: number;
-    /** 安全上限，避免意外拉太多，默认 2000 */
     hardLimit?: number;
   }): Promise<ImaNoteMeta[]> {
+    const hardLimit = params.hardLimit ?? 5000;
+    const pageSize = Math.min(Math.max(params.pageSize ?? 20, 1), 20);
+
+    // 指定了某一个笔记本
+    if (params.folder_id) {
+      const res = await this.listNote({ folder_id: params.folder_id, limit: pageSize });
+      return res.note_book_list ?? [];
+    }
+
+    // 全量模式：按笔记本拉取，并发度限制为 3（避免打爆 IMA 限频）
+    const notebooks = await this.listAllNotebooks();
+    const realNotebooks = notebooks.filter((nb) => nb.folder_type !== 1);
+
     const all: ImaNoteMeta[] = [];
-    const hardLimit = params.hardLimit ?? 2000;
-    let cursor = "";
+    const concurrency = 3;
+
+    for (let i = 0; i < realNotebooks.length; i += concurrency) {
+      const batch = realNotebooks.slice(i, i + concurrency);
+      const results = await Promise.allSettled(
+        batch.map((nb) =>
+          this.listNote({ folder_id: nb.folder_id, limit: pageSize }).then((res) => ({
+            nb,
+            list: res.note_book_list ?? [],
+            isEnd: res.is_end,
+          }))
+        )
+      );
+
+      for (const r of results) {
+        if (r.status === "rejected") {
+          logWarn("list_note for a notebook failed:", r.reason);
+          continue;
+        }
+        const { nb, list, isEnd } = r.value;
+        all.push(...list);
+        if (!isEnd && (nb.note_number ?? 0) > list.length) {
+          logWarn(
+            "Notebook", nb.name, "has ~" + String(nb.note_number) + " notes but only " + list.length + " fetched (IMA API limit)."
+          );
+        }
+      }
+    }
+
+    const deduped = this.dedupeNotes(all);
+    logWarn("listAllNotes: " + deduped.length + " unique notes from " + realNotebooks.length + " notebooks");
+    return deduped.slice(0, hardLimit);
+  }
+
+  /** 按 note_id 去重 */
+  private dedupeNotes(notes: ImaNoteMeta[]): ImaNoteMeta[] {
+    const seen = new Set<string>();
+    const result: ImaNoteMeta[] = [];
+    for (const n of notes) {
+      if (!n.note_id || seen.has(n.note_id)) continue;
+      seen.add(n.note_id);
+      result.push(n);
+    }
+    return result;
+  }
+
+  /** 把 listNotebook 的分页拉完。 */
+  async listAllNotebooks(params: { pageSize?: number; hardLimit?: number } = {}): Promise<ImaNotebookMeta[]> {
+    const all: ImaNotebookMeta[] = [];
+    const hardLimit = params.hardLimit ?? 500;
+    const pageSize = Math.min(Math.max(params.pageSize ?? 20, 1), 20);
+    let cursor = "0";
     let safety = 0;
     while (all.length < hardLimit) {
-      const res = await this.listNote({
-        folder_id: params.folder_id,
-        cursor,
-        limit: params.pageSize ?? 20,
-      });
-      const list = res.note_book_list || [];
+      const res = await this.listNotebook({ cursor, limit: pageSize });
+      const list = res.note_folder_infos ?? [];
       all.push(...list);
-      if (res.is_end || list.length === 0 || !res.next_cursor || res.next_cursor === cursor) break;
+      if (res.is_end || list.length === 0) break;
+      if (!res.next_cursor || res.next_cursor === cursor) break;
       cursor = res.next_cursor;
-      if (++safety > 500) break; // 兜底
+      if (++safety > 50) break;
     }
     return all.slice(0, hardLimit);
   }

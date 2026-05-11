@@ -9,6 +9,7 @@ import {
 import { ImaSyncSettings } from "../types";
 import { ImaApiClient, ImaApiError, ImaNoteMeta } from "./ImaApiClient";
 import { logWarn } from "../logger";
+import { imaJsonToMarkdown } from "../imaJsonToMarkdown";
 
 /**
  * 腾讯 IMA OpenAPI 同步通道。
@@ -128,7 +129,39 @@ export class ImaOpenApiProvider implements SyncProvider {
   }
 
   async fetchRemote(item: RemoteItem): Promise<RemoteContent> {
-    // IMA 目前只支持 PLAINTEXT / JSON，不支持 MARKDOWN
+    // 优先用 JSON 格式（format=2）并转为 Markdown，保留原始格式
+    try {
+      const res = await this.client.getDocContent({ note_id: item.remoteId, format: 2 });
+      const raw = res.content ?? "";
+
+      // 完整性校验：JSON 内容必须以 '[' 开头 ']' 结尾，否则可能被截断
+      const trimmed = raw.trim();
+      if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
+        logWarn("fetchRemote: JSON content appears truncated for note", item.title, "- falling back to plaintext");
+        return this.fetchPlaintext(item);
+      }
+
+      const markdown = imaJsonToMarkdown(raw);
+
+      // 内容为空保护：如果转换结果为空但原始 JSON 非空，说明转换器出了问题
+      if (!markdown.trim() && trimmed.length > 10) {
+        logWarn("fetchRemote: JSON->MD conversion yielded empty for note", item.title, "- falling back to plaintext");
+        return this.fetchPlaintext(item);
+      }
+
+      return {
+        content: markdown,
+        format: "markdown",
+        modifyTime: item.modifyTime,
+      };
+    } catch (e) {
+      logWarn("fetchRemote: JSON format failed for note", item.title, ":", e, "- falling back to plaintext");
+      return this.fetchPlaintext(item);
+    }
+  }
+
+  /** 纯文本兜底拉取 */
+  private async fetchPlaintext(item: RemoteItem): Promise<RemoteContent> {
     const res = await this.client.getDocContent({ note_id: item.remoteId, format: 0 });
     return {
       content: res.content ?? "",
@@ -149,6 +182,7 @@ export class ImaOpenApiProvider implements SyncProvider {
     if (max > 0) {
       const buf = new TextEncoder().encode(body);
       if (buf.byteLength > max) {
+        logWarn("Note", title, "exceeds size limit (" + buf.byteLength + " > " + max + " bytes). Content will be truncated.");
         const truncated = new TextDecoder("utf-8", { fatal: false }).decode(buf.slice(0, max));
         body = truncated + "\n\n> Content exceeds the per-note size limit and has been truncated.";
       }

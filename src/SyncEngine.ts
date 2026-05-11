@@ -202,18 +202,59 @@ export class SyncEngine {
       }
 
       stats.total = items.length;
-      if (!silent) new Notice(`Pulling ${items.length} note(s) from IMA`);
+      // Progress indicator: a long-lived Notice that we update as items are processed
+      const progressNotice = silent ? null : new Notice("", 0); // duration=0 means manual dismiss
+      const updateProgress = (processed: number) => {
+        if (!progressNotice) return;
+        const pct = Math.round((processed / items.length) * 100);
+        const bar = "█".repeat(Math.floor(pct / 5)) + "░".repeat(20 - Math.floor(pct / 5));
+        progressNotice.setMessage(
+          `Pulling from IMA: ${processed}/${items.length}\n${bar} ${pct}%`
+        );
+      };
+      updateProgress(0);
 
       const mappingManager = new FolderMappingManager(this.settings);
-      for (const item of items) {
+      const PULL_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes max
+      const SAVE_INTERVAL = 10; // save settings every N items
+      const startTime = Date.now();
+
+      for (let i = 0; i < items.length; i++) {
+        // Timeout breaker
+        if (Date.now() - startTime > PULL_TIMEOUT_MS) {
+          logWarn("Pull timeout after 5 minutes, stopping with partial results.");
+          if (progressNotice) progressNotice.hide();
+          if (!silent) new Notice("Pull timed out after 5 minutes. Partial results saved.");
+          break;
+        }
+
+        const item = items[i];
         try {
-          const outcome = await this.pullSingleItem(puller, item, mappingManager);
+          let outcome = await this.pullSingleItem(puller, item, mappingManager);
+          // Retry once on failure (covers transient errors like missing parent dirs)
+          if (outcome === "failed") {
+            await this.delay(500);
+            outcome = await this.pullSingleItem(puller, item, mappingManager);
+          }
           stats[outcome] = stats[outcome] + 1;
+          if (outcome === "failed") {
+            stats.errors.push({ remoteId: item.remoteId, error: item.title ?? "unknown" });
+          }
         } catch (e) {
           stats.failed++;
           stats.errors.push({ remoteId: item.remoteId, error: (e as Error).message });
         }
+
+        updateProgress(i + 1);
+
+        // Periodic save to avoid losing progress on crash
+        if ((i + 1) % SAVE_INTERVAL === 0) {
+          await this.saveSettings();
+        }
       }
+
+      // Dismiss progress notice
+      if (progressNotice) progressNotice.hide();
 
       this.settings.lastPullAt = Date.now();
       await this.saveSettings();
@@ -222,7 +263,13 @@ export class SyncEngine {
         `Pull complete: ` +
         `${stats.created} created / ${stats.updated} updated / ` +
         `${stats.skipped} skipped / ${stats.conflicted} conflicted / ${stats.failed} failed`;
-      if (!silent) new Notice(summary);
+      if (!silent) {
+        new Notice(summary);
+        if (stats.failed > 0) {
+          const failedTitles = stats.errors.map((e) => e.error).slice(0, 5).join(", ");
+          new Notice(`Failed notes: ${failedTitles}${stats.errors.length > 5 ? "..." : ""}`, 8000);
+        }
+      }
       logDebug(summary, stats);
 
       return stats;
@@ -649,17 +696,27 @@ export class SyncEngine {
   }
 
   private async ensureFolder(relPath: string): Promise<void> {
-    const dir = relPath.split("/").slice(0, -1).join("/");
-    if (!dir) return;
-    const existing = this.app.vault.getAbstractFileByPath(dir);
-    if (existing instanceof TFolder) return;
-    if (!existing) {
-      try {
-        await this.app.vault.createFolder(dir);
-      } catch {
-        // ignore "already exists" races
+    const parts = relPath.split("/").slice(0, -1); // all directory segments
+    if (parts.length === 0) return;
+
+    // Build each level and create if missing
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      const existing = this.app.vault.getAbstractFileByPath(current);
+      if (existing instanceof TFolder) continue;
+      if (!existing) {
+        try {
+          await this.app.vault.createFolder(current);
+        } catch {
+          // ignore "already exists" races
+        }
       }
     }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => activeWindow.setTimeout(resolve, ms));
   }
 
   private recordPullState(relativePath: string, item: RemoteItem, content: string): void {

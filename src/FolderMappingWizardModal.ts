@@ -112,18 +112,7 @@ export class FolderMappingWizardModal extends Modal {
     this.render();
     try {
       const client = new ImaApiClient({ clientId, apiKey });
-      const all: ImaNotebookMeta[] = [];
-      let cursor = "0";
-      let safety = 0;
-      while (safety++ < 50) {
-        const res = await client.listNotebook({ cursor, limit: 20 });
-        const list = res.note_folder_infos ?? [];
-        all.push(...list);
-        if (res.is_end || list.length === 0) break;
-        if (!res.next_cursor || res.next_cursor === cursor) break;
-        cursor = res.next_cursor;
-      }
-      this.notebooks = all;
+      this.notebooks = await client.listAllNotebooks();
     } catch (e) {
       const msg = e instanceof ImaApiError ? `${e.apiMsg} (code=${e.code})` : (e as Error).message;
       new Notice(`Failed to load notebooks — ${msg}`, 5000);
